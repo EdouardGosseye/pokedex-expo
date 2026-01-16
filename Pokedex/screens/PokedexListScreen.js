@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 
 import { PokemonCard } from "../components/PokemonCard";
-import { normalizeText } from "../utils/pokemon";
+import { getIdFromUrl, normalizeText } from "../utils/pokemon";
 
 const LIMIT = 151;
 
@@ -13,6 +13,7 @@ export function PokedexListScreen({ navigation }) {
   const [data, setData] = useState([]);
 
   const [query, setQuery] = useState("");
+  const [sortMode, setSortMode] = useState("ID_ASC"); // ID_ASC | ID_DESC | AZ | ZA
 
   useEffect(() => {
     console.log("[PokedexListScreen] mount");
@@ -41,11 +42,26 @@ export function PokedexListScreen({ navigation }) {
     };
   }, []);
 
-  const filtered = useMemo(() => {
+  const filteredSorted = useMemo(() => {
     const q = normalizeText(query);
-    if (q.length === 0) return data;
-    return data.filter((p) => normalizeText(p.name).includes(q));
-  }, [data, query]);
+
+    let list = data;
+    if (q.length > 0) list = list.filter((p) => normalizeText(p.name).includes(q));
+
+    const copy = [...list];
+    copy.sort((a, b) => {
+      const ida = getIdFromUrl(a.url);
+      const idb = getIdFromUrl(b.url);
+
+      if (sortMode === "ID_ASC") return ida - idb;
+      if (sortMode === "ID_DESC") return idb - ida;
+      if (sortMode === "AZ") return a.name.localeCompare(b.name);
+      if (sortMode === "ZA") return b.name.localeCompare(a.name);
+      return 0;
+    });
+
+    return copy;
+  }, [data, query, sortMode]);
 
   if (loading) {
     return (
@@ -79,16 +95,23 @@ export function PokedexListScreen({ navigation }) {
         clearButtonMode="while-editing"
       />
 
-      {filtered.length === 0 ? (
+      <View style={styles.row}>
+        <Chip label="ID ↑" active={sortMode === "ID_ASC"} onPress={() => setSortMode("ID_ASC")} />
+        <Chip label="ID ↓" active={sortMode === "ID_DESC"} onPress={() => setSortMode("ID_DESC")} />
+        <Chip label="A→Z" active={sortMode === "AZ"} onPress={() => setSortMode("AZ")} />
+        <Chip label="Z→A" active={sortMode === "ZA"} onPress={() => setSortMode("ZA")} />
+      </View>
+
+      {filteredSorted.length === 0 ? (
         <View style={styles.centerInScreen}>
           <Text style={styles.emptyTitle}>No results</Text>
           <Text style={styles.muted}>Try another search.</Text>
         </View>
       ) : (
         <FlashList
-          data={filtered}
+          data={filteredSorted}
           estimatedItemSize={88}
-          keyExtractor={(item) => item.name}
+          keyExtractor={(item) => String(getIdFromUrl(item.url))}
           renderItem={({ item }) => (
             <PokemonCard
               name={item.name}
@@ -102,10 +125,23 @@ export function PokedexListScreen({ navigation }) {
   );
 }
 
+function Chip({ label, active, onPress }) {
+  return (
+    <Pressable onPress={onPress} style={[styles.chip, active && styles.chipActive]}>
+      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, padding: 12, gap: 10, backgroundColor: "#fff" },
   title: { fontSize: 24, fontWeight: "800" },
   input: { borderWidth: 1, borderColor: "#ddd", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
+  row: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: { borderWidth: 1, borderColor: "#ddd", borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
+  chipActive: { backgroundColor: "#111", borderColor: "#111" },
+  chipText: { fontWeight: "800" },
+  chipTextActive: { color: "#fff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8, padding: 16, backgroundColor: "#fff" },
   centerInScreen: { flex: 1, alignItems: "center", justifyContent: "center", gap: 6, padding: 16 },
   muted: { color: "#666" },
