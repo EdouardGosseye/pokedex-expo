@@ -1,33 +1,29 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { FlashList } from "@shopify/flash-list";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { capitalize } from "../utils/pokemon";
 
-import { PokemonCard } from "../components/PokemonCard";
-import { getIdFromUrl, normalizeText } from "../utils/pokemon";
+export function PokemonDetailScreen({ route, navigation }) {
+  const { name } = route.params;
 
-const LIMIT = 151;
-
-export function PokedexListScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [data, setData] = useState([]);
-
-  const [query, setQuery] = useState("");
-  const [sortMode, setSortMode] = useState("ID_ASC");
-  const [onlyFirst50, setOnlyFirst50] = useState(false);
+  const [pokemon, setPokemon] = useState(null);
 
   useEffect(() => {
-    console.log("[PokedexListScreen] mount");
+    console.log("[PokemonDetailScreen] mount", name);
     let cancelled = false;
 
     async function load() {
       try {
         setLoading(true);
         setError("");
-        const res = await fetch(`https://pokeapi.co/api/v2/pokemon?limit=${LIMIT}&offset=0`);
-        if (!res.ok) throw new Error("Failed to fetch pokemon list");
+        setPokemon(null);
+
+        const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${name}`);
+        if (!res.ok) throw new Error("Failed to fetch pokemon detail");
         const json = await res.json();
-        if (!cancelled) setData(json.results ?? []);
+
+        if (!cancelled) setPokemon(json);
       } catch (e) {
         if (!cancelled) setError(e.message || "Unknown error");
       } finally {
@@ -38,39 +34,16 @@ export function PokedexListScreen({ navigation }) {
     load();
 
     return () => {
-      console.log("[PokedexListScreen] unmount (cleanup)");
+      console.log("[PokemonDetailScreen] unmount (cleanup)", name);
       cancelled = true;
     };
-  }, []);
-
-  const filteredSorted = useMemo(() => {
-    const q = normalizeText(query);
-
-    let list = data;
-
-    if (q.length > 0) list = list.filter((p) => normalizeText(p.name).includes(q));
-    if (onlyFirst50) list = list.filter((p) => getIdFromUrl(p.url) <= 50);
-
-    const copy = [...list];
-    copy.sort((a, b) => {
-      const ida = getIdFromUrl(a.url);
-      const idb = getIdFromUrl(b.url);
-
-      if (sortMode === "ID_ASC") return ida - idb;
-      if (sortMode === "ID_DESC") return idb - ida;
-      if (sortMode === "AZ") return a.name.localeCompare(b.name);
-      if (sortMode === "ZA") return b.name.localeCompare(a.name);
-      return 0;
-    });
-
-    return copy;
-  }, [data, query, sortMode, onlyFirst50]);
+  }, [name]);
 
   if (loading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator />
-        <Text style={styles.muted}>Loading pokédex…</Text>
+        <Text style={styles.muted}>Loading detail…</Text>
       </View>
     );
   }
@@ -84,74 +57,55 @@ export function PokedexListScreen({ navigation }) {
     );
   }
 
+  if (!pokemon) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.muted}>Not found.</Text>
+      </View>
+    );
+  }
+
+  const img = pokemon.sprites?.front_default;
+  const types = pokemon.types?.map((t) => t.type.name).join(", ") ?? "-";
+
   return (
     <View style={styles.screen}>
-      <Text style={styles.title}>Pokédex</Text>
+      <Text style={styles.title}>{capitalize(pokemon.name)}</Text>
 
-      <TextInput
-        value={query}
-        onChangeText={setQuery}
-        placeholder="Search by name…"
-        style={styles.input}
-        autoCapitalize="none"
-        autoCorrect={false}
-        clearButtonMode="while-editing"
-      />
+      {img ? <Image source={{ uri: img }} style={styles.hero} /> : null}
 
-      <View style={styles.row}>
-        <Chip label="ID ↑" active={sortMode === "ID_ASC"} onPress={() => setSortMode("ID_ASC")} />
-        <Chip label="ID ↓" active={sortMode === "ID_DESC"} onPress={() => setSortMode("ID_DESC")} />
-        <Chip label="A→Z" active={sortMode === "AZ"} onPress={() => setSortMode("AZ")} />
-        <Chip label="Z→A" active={sortMode === "ZA"} onPress={() => setSortMode("ZA")} />
+      <View style={styles.card}>
+        <Text style={styles.label}>Types</Text>
+        <Text style={styles.value}>{types}</Text>
+
+        <Text style={styles.label}>Height</Text>
+        <Text style={styles.value}>{pokemon.height}</Text>
+
+        <Text style={styles.label}>Weight</Text>
+        <Text style={styles.value}>{pokemon.weight}</Text>
+
+        <Text style={styles.label}>Base experience</Text>
+        <Text style={styles.value}>{pokemon.base_experience}</Text>
       </View>
 
-      <View style={styles.row}>
-        <Chip label={`Only ID ≤ 50 ${onlyFirst50 ? "✓" : ""}`} active={onlyFirst50} onPress={() => setOnlyFirst50((v) => !v)} />
-      </View>
-
-      {filteredSorted.length === 0 ? (
-        <View style={styles.centerInScreen}>
-          <Text style={styles.emptyTitle}>No results</Text>
-          <Text style={styles.muted}>Try another search or disable filters.</Text>
-        </View>
-      ) : (
-        <FlashList
-          data={filteredSorted}
-          estimatedItemSize={88}
-          keyExtractor={(item) => String(getIdFromUrl(item.url))}
-          renderItem={({ item }) => (
-            <PokemonCard
-              name={item.name}
-              url={item.url}
-              onPress={() => navigation.navigate("PokemonDetail", { name: item.name })}
-            />
-          )}
-        />
-      )}
+      <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [styles.btn, pressed && styles.btnPressed]}>
+        <Text style={styles.btnText}>Back</Text>
+      </Pressable>
     </View>
   );
 }
 
-function Chip({ label, active, onPress }) {
-  return (
-    <Pressable onPress={onPress} style={[styles.chip, active && styles.chipActive]}>
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
-  screen: { flex: 1, padding: 12, gap: 10, backgroundColor: "#fff" },
-  title: { fontSize: 24, fontWeight: "800" },
-  input: { borderWidth: 1, borderColor: "#ddd", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
-  row: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: { borderWidth: 1, borderColor: "#ddd", borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
-  chipActive: { backgroundColor: "#111", borderColor: "#111" },
-  chipText: { fontWeight: "800" },
-  chipTextActive: { color: "#fff" },
+  screen: { flex: 1, padding: 12, gap: 12, backgroundColor: "#fff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8, padding: 16, backgroundColor: "#fff" },
-  centerInScreen: { flex: 1, alignItems: "center", justifyContent: "center", gap: 6, padding: 16 },
+  title: { fontSize: 26, fontWeight: "900" },
+  hero: { width: 160, height: 160, alignSelf: "center" },
+  card: { borderWidth: 1, borderColor: "#eee", borderRadius: 16, padding: 12, gap: 6 },
+  label: { color: "#666", fontWeight: "800" },
+  value: { fontSize: 16, fontWeight: "700" },
+  btn: { paddingVertical: 14, borderRadius: 14, backgroundColor: "#111", alignItems: "center" },
+  btnPressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
+  btnText: { color: "#fff", fontWeight: "900" },
   muted: { color: "#666" },
-  emptyTitle: { fontSize: 18, fontWeight: "800" },
-  errorTitle: { fontSize: 18, fontWeight: "700", color: "#B00020" },
+  errorTitle: { fontSize: 18, fontWeight: "800", color: "#B00020" },
 });
