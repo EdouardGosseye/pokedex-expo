@@ -13,7 +13,8 @@ export function PokedexListScreen({ navigation }) {
   const [data, setData] = useState([]);
 
   const [query, setQuery] = useState("");
-  const [sortMode, setSortMode] = useState("ID_ASC"); // ID_ASC | ID_DESC | AZ | ZA
+  const [sortMode, setSortMode] = useState("ID_ASC");
+  const [onlyFirst50, setOnlyFirst50] = useState(false);
 
   useEffect(() => {
     console.log("[PokedexListScreen] mount");
@@ -46,7 +47,9 @@ export function PokedexListScreen({ navigation }) {
     const q = normalizeText(query);
 
     let list = data;
+
     if (q.length > 0) list = list.filter((p) => normalizeText(p.name).includes(q));
+    if (onlyFirst50) list = list.filter((p) => getIdFromUrl(p.url) <= 50);
 
     const copy = [...list];
     copy.sort((a, b) => {
@@ -61,7 +64,7 @@ export function PokedexListScreen({ navigation }) {
     });
 
     return copy;
-  }, [data, query, sortMode]);
+  }, [data, query, sortMode, onlyFirst50]);
 
   if (loading) {
     return (
@@ -102,10 +105,14 @@ export function PokedexListScreen({ navigation }) {
         <Chip label="Z→A" active={sortMode === "ZA"} onPress={() => setSortMode("ZA")} />
       </View>
 
+      <View style={styles.row}>
+        <Chip label={`Only ID ≤ 50 ${onlyFirst50 ? "✓" : ""}`} active={onlyFirst50} onPress={() => setOnlyFirst50((v) => !v)} />
+      </View>
+
       {filteredSorted.length === 0 ? (
         <View style={styles.centerInScreen}>
           <Text style={styles.emptyTitle}>No results</Text>
-          <Text style={styles.muted}>Try another search.</Text>
+          <Text style={styles.muted}>Try another search or disable filters.</Text>
         </View>
       ) : (
         <FlashList
