@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, StyleSheet, Text, TextInput, View } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 
 import { PokemonCard } from "../components/PokemonCard";
+import { normalizeText } from "../utils/pokemon";
 
 const LIMIT = 151;
 
@@ -10,6 +11,8 @@ export function PokedexListScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [data, setData] = useState([]);
+
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     console.log("[PokedexListScreen] mount");
@@ -38,6 +41,12 @@ export function PokedexListScreen({ navigation }) {
     };
   }, []);
 
+  const filtered = useMemo(() => {
+    const q = normalizeText(query);
+    if (q.length === 0) return data;
+    return data.filter((p) => normalizeText(p.name).includes(q));
+  }, [data, query]);
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -60,18 +69,35 @@ export function PokedexListScreen({ navigation }) {
     <View style={styles.screen}>
       <Text style={styles.title}>Pokédex</Text>
 
-      <FlashList
-        data={data}
-        estimatedItemSize={88}
-        keyExtractor={(item) => item.name}
-        renderItem={({ item }) => (
-          <PokemonCard
-            name={item.name}
-            url={item.url}
-            onPress={() => navigation.navigate("PokemonDetail", { name: item.name })}
-          />
-        )}
+      <TextInput
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Search by name…"
+        style={styles.input}
+        autoCapitalize="none"
+        autoCorrect={false}
+        clearButtonMode="while-editing"
       />
+
+      {filtered.length === 0 ? (
+        <View style={styles.centerInScreen}>
+          <Text style={styles.emptyTitle}>No results</Text>
+          <Text style={styles.muted}>Try another search.</Text>
+        </View>
+      ) : (
+        <FlashList
+          data={filtered}
+          estimatedItemSize={88}
+          keyExtractor={(item) => item.name}
+          renderItem={({ item }) => (
+            <PokemonCard
+              name={item.name}
+              url={item.url}
+              onPress={() => navigation.navigate("PokemonDetail", { name: item.name })}
+            />
+          )}
+        />
+      )}
     </View>
   );
 }
@@ -79,7 +105,10 @@ export function PokedexListScreen({ navigation }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, padding: 12, gap: 10, backgroundColor: "#fff" },
   title: { fontSize: 24, fontWeight: "800" },
+  input: { borderWidth: 1, borderColor: "#ddd", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8, padding: 16, backgroundColor: "#fff" },
+  centerInScreen: { flex: 1, alignItems: "center", justifyContent: "center", gap: 6, padding: 16 },
   muted: { color: "#666" },
+  emptyTitle: { fontSize: 18, fontWeight: "800" },
   errorTitle: { fontSize: 18, fontWeight: "700", color: "#B00020" },
 });
