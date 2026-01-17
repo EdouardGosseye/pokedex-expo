@@ -4,7 +4,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import { PokedexListScreen } from "../screens/PokedexListScreen";
 import { PokemonDetailScreen } from "../screens/PokemonDetailScreen";
-import { ProfileScreen } from "../screens/ProfileScreen.js";
+import { ProfileScreen } from "../screens/ProfileScreen";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();

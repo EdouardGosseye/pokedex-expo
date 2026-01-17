@@ -13,7 +13,7 @@ export function ProfileScreen() {
       <Text style={styles.muted}>Student • Graduaat Programmeren</Text>
       <View style={styles.card}>
         <Text style={styles.label}>Bio</Text>
-        <Text style={styles.value}>Pokédex app met FlashList + search/sort/filter.</Text>
+        <Text style={styles.value}>Pokédex app</Text>
         <Text style={styles.label}>Contact</Text>
         <Text style={styles.value}>edouard@gmail.com</Text>
       </View>
